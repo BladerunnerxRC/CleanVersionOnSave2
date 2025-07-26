@@ -1,4 +1,4 @@
-# CleanVersionOnSave2
+# CleanVersionOnSave
 
 A Fusion 360 Add-In that enforces clean filenames on save & export, logs changes, and syncs externally.
 
@@ -15,7 +15,7 @@ A Fusion 360 Add-In that enforces clean filenames on save & export, logs changes
 ## Installation
 
 1. Clone this repo into your Fusion 360 Add-Ins folder:  
-   `~/Autodesk/Fusion 360/API/AddIns/CleanVersionOnSave2`  
+   `~/Autodesk/Fusion 360/API/AddIns/CleanVersionOnSave`  
 2. Place icons in `resources/icons/`:  
    - `icon16.png`, `icon32.png`, `icon128.png`  
 3. Launch Fusion 360. Enable the Add-In under **Scripts and Add-Ins**.
@@ -46,4 +46,3 @@ Settings persist in `data/config.json`.
 ## License
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for details.
-
