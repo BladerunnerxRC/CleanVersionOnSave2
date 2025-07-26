@@ -1,0 +1,183 @@
+name: Python Package CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8 jsonschema
+
+      - name: Lint Python code
+        run: |
+          flake8 src --max-line-length=120
+
+      - name: Check JSON syntax
+        run: |
+          for f in manifest.json data/config.json; do
+            python - <<EOF
+import json, sys
+try:
+    json.load(open("$f"))
+except Exception as e:
+    print(f"❌ Invalid JSON in $f: {e}")
+    sys.exit(1)
+EOF
+          done
+
+      - name: Validate manifest.json schema
+        run: |
+          python - <<'EOF'
+import json, jsonschema, sys
+
+schema = {
+  "type": "object",
+  "required": [
+    "autodeskProduct",
+    "type",
+    "id",
+    "author",
+    "description",
+    "version",
+    "runOnStartup",
+    "main"
+  ],
+  "properties": {
+    "autodeskProduct": {"type": "string"},
+    "type": {"enum": ["addin"]},
+    "id": {"type": "string"},
+    "author": {"type": "string"},
+    "description": {"type": "string"},
+    "version": {"type": "string"},
+    "runOnStartup": {"type": "boolean"},
+    "main": {"type": "string"}
+  },
+  "additionalProperties": false
+}
+
+manifest = json.load(open('manifest.json'))
+try:
+    jsonschema.validate(manifest, schema)
+    print("✅ manifest.json is valid")
+except Exception as e:
+    print(f"❌ manifest.json schema validation failed: {e}")
+    sys.exit(1)
+EOF
+
+      - name: Validate config.json schema
+        run: |
+          python - <<'EOF'
+import json, jsonschema, sys
+
+schema = {
+  "type": "object",
+  "required": [
+    "addInId",
+    "autoRunOnStartup",
+    "versionControl",
+    "autoRename",
+    "notifications",
+    "logging"
+  ],
+  "properties": {
+    "addInId": {"type": "string"},
+    "autoRunOnStartup": {"type": "boolean"},
+    "versionControl": {
+      "type": "object",
+      "required": ["versionFile", "versionPattern", "defaultIncrement"],
+      "properties": {
+        "versionFile": {"type": "string"},
+        "versionPattern": {"type": "string"},
+        "defaultIncrement": {"enum": ["major", "minor", "patch"]}
+      }
+    },
+    "autoRename": {
+      "type": "object",
+      "required": ["enabled", "historyFile"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "historyFile": {"type": "string"}
+      }
+    },
+    "notifications": {
+      "type": "object",
+      "required": ["enabled", "showSuccess", "showError"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "showSuccess": {"type": "boolean"},
+        "showError": {"type": "boolean"}
+      }
+    },
+    "logging": {
+      "type": "object",
+      "required": ["level", "logFile"],
+      "properties": {
+        "level": {"enum": ["DEBUG", "INFO", "WARN", "ERROR"]},
+        "logFile": {"type": "string"}
+      }
+    }
+  },
+  "additionalProperties": false
+}
+
+cfg = json.load(open('data/config.json'))
+try:
+    jsonschema.validate(cfg, schema)
+    print("✅ config.json is valid")
+except Exception as e:
+    print(f"❌ config.json schema validation failed: {e}")
+    sys.exit(1)
+EOF
+
+  windows-test:
+    runs-on: windows-latest
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dev dependencies
+        run: pip install flake8 jsonschema pytest
+
+      - name: Lint Python code on Windows
+        run: flake8 src --max-line-length=120
+
+      - name: Validate JSON on Windows
+        run: |
+          python - <<EOF
+import json, sys
+for f in ['manifest.json', 'data/config.json']:
+    try:
+        json.load(open(f))
+    except Exception as e:
+        print(f"❌ Invalid JSON in {f}: {e}")
+        sys.exit(1)
+print("✅ JSON syntax is valid on Windows")
+EOF
+
+      - name: Run Windows-specific tests
+        run: pytest tests/windows

@@ -2,7 +2,7 @@
   "autodeskProduct": "fusion360",
   "type": "addin",
   "id": "com.thomas.cleanversiononsave2",
-  "author": "Thomas",
+  "author": "BladerunnerxRC",
   "description": "Auto-renames Fusion documents, logs history, and validates names",
   "version": "1.0.0",
   "runOnStartup": true,

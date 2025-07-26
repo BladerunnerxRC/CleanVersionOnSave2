@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Extension Settings</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 1.5rem;
+    }
+    form label {
+      display: flex;
+      margin-bottom: 0.5rem;
+      align-items: center;
+    }
+    form label span {
+      width: 150px;
+    }
+    form input[type="text"],
+    form select {
+      flex: 1;
+      padding: 0.25rem;
+    }
+    form input[type="checkbox"] {
+      margin-left: 0.5rem;
+    }
+    fieldset {
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      padding: 0.75rem;
+    }
+    legend {
+      font-weight: bold;
+    }
+    #saveBtn {
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>Extension Settings</h1>
+  <form id="settingsForm">
+    <label>
+      <span>Add-In ID</span>
+      <input type="text" name="addInId" />
+    </label>
+
+    <label>
+      <span>Auto Run on Startup</span>
+      <input type="checkbox" name="autoRunOnStartup" />
+    </label>
+
+    <fieldset>
+      <legend>Version Control</legend>
+      <label>
+        <span>Version File</span>
+        <input type="text" name="versionFile" />
+      </label>
+      <label>
+        <span>Version Pattern</span>
+        <input type="text" name="versionPattern" />
+      </label>
+      <label>
+        <span>Default Increment</span>
+        <select name="defaultIncrement">
+          <option value="major">major</option>
+          <option value="minor">minor</option>
+          <option value="patch">patch</option>
+        </select>
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Auto Rename</legend>
+      <label>
+        <span>Enabled</span>
+        <input type="checkbox" name="autoRenameEnabled" />
+      </label>
+      <label>
+        <span>History File</span>
+        <input type="text" name="historyFile" />
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Notifications</legend>
+      <label>
+        <span>Enabled</span>
+        <input type="checkbox" name="notificationsEnabled" />
+      </label>
+      <label>
+        <span>Show Success</span>
+        <input type="checkbox" name="showSuccess" />
+      </label>
+      <label>
+        <span>Show Error</span>
+        <input type="checkbox" name="showError" />
+      </label>
+    </fieldset>
+
+    <fieldset>
+      <legend>Logging</legend>
+      <label>
+        <span>Level</span>
+        <select name="logLevel">
+          <option value="DEBUG">DEBUG</option>
+          <option value="INFO">INFO</option>
+          <option value="WARN">WARN</option>
+          <option value="ERROR">ERROR</option>
+        </select>
+      </label>
+      <label>
+        <span>Log File</span>
+        <input type="text" name="logFile" />
+      </label>
+    </fieldset>
+
+    <button type="button" id="saveBtn">Save Settings</button>
+  </form>
+
+  <script>
+    const form = document.getElementById('settingsForm');
+
+    // Populate all fields on first load
+    function loadSettings(cfg) {
+      form.addInId.value                   = cfg.addInId;
+      form.autoRunOnStartup.checked        = cfg.autoRunOnStartup;
+
+      form.versionFile.value               = cfg.versionControl.versionFile;
+      form.versionPattern.value            = cfg.versionControl.versionPattern;
+      form.defaultIncrement.value          = cfg.versionControl.defaultIncrement;
+
+      form.autoRenameEnabled.checked       = cfg.autoRename.enabled;
+      form.historyFile.value               = cfg.autoRename.historyFile;
+
+      form.notificationsEnabled.checked    = cfg.notifications.enabled;
+      form.showSuccess.checked             = cfg.notifications.showSuccess;
+      form.showError.checked               = cfg.notifications.showError;
+
+      form.logLevel.value                  = cfg.logging.level;
+      form.logFile.value                   = cfg.logging.logFile;
+    }
+
+    // Called on external edits (live-reload)
+    function updateSettings(cfg) {
+      loadSettings(cfg);
+      console.log('Settings reloaded from disk', cfg);
+    }
+
+    // Gather form data and emit back to Python
+    function save() {
+      const payload = {
+        addInId:            form.addInId.value,
+        autoRunOnStartup:   form.autoRunOnStartup.checked,
+        versionControl: {
+          versionFile:      form.versionFile.value,
+          versionPattern:   form.versionPattern.value,
+          defaultIncrement: form.defaultIncrement.value
+        },
+        autoRename: {
+          enabled:         form.autoRenameEnabled.checked,
+          historyFile:     form.historyFile.value
+        },
+        notifications: {
+          enabled:         form.notificationsEnabled.checked,
+          showSuccess:     form.showSuccess.checked,
+          showError:       form.showError.checked
+        },
+        logging: {
+          level:           form.logLevel.value,
+          logFile:         form.logFile.value
+        }
+      };
+      adsk.fusion.emitHtmlEvent(JSON.stringify({ action: 'save', payload }));
+    }
+
+    // Wire up Save button
+    document.getElementById('saveBtn')
+      .addEventListener('click', save);
+  </script>
+</body>
+</html>
