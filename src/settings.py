@@ -76,7 +76,8 @@ def run(context):
                         with open(self.configPath, 'r') as f:
                             cfg = json.load(f)
                         # call JS updateSettings(cfg)
-                        palette.evaluateJavascript(f'updateSettings({json.dumps(cfg)});')
+                        if palette is not None:
+                            palette.evaluateJavascript(f'updateSettings({json.dumps(cfg)});')
                 except:
                     pass
 
