@@ -1,3 +1,4 @@
+import os
 import adsk.core, adsk.fusion
 import settings, export_hook
 
@@ -15,11 +16,15 @@ def register_commands():
     app = adsk.core.Application.get()
     ui = app.userInterface
 
+    # Absolute path to your icons folder
+    ICON_FOLDER = os.path.join(os.path.dirname(__file__), 'resources', 'icons')
+
     # Settings button
     settings_cmd = ui.commandDefinitions.addButtonDefinition(
-        'cmdSettings',
-        'CleanVersion Settings',
-        'Configure renaming behavior'
+        'cmdSettings',                   # internal ID
+        'CleanVersion Settings',         # displayed name
+        'Configure renaming behavior',   # tooltip description
+        ICON_FOLDER                      # path to your icons
     )
     settings_handler = SettingsCommandCreatedEventHandler()
     settings_cmd.commandCreated.add(settings_handler)
@@ -27,15 +32,16 @@ def register_commands():
 
     # Manual export button
     export_cmd = ui.commandDefinitions.addButtonDefinition(
-        'cmdExport',
-        'Export Clean Version',
-        'Export STEP with cleaned name'
+        'cmdExport',                       # internal ID
+        'Export Clean Version',            # displayed name
+        'Export STEP with cleaned name',   # tooltip description
+        ICON_FOLDER                        # path to your icons
     )
     export_handler = ExportCommandCreatedEventHandler()
     export_cmd.commandCreated.add(export_handler)
     handlers.append(export_handler)
 
-    # Add to toolbar panel
-    panel = ui.allToolbarPanels.itemById('FusionSolidCreatePanel')
+    # Add commands to the Solid Create panel
+    panel = ui.allToolbarPanels.itemById('SolidCreatePanel')
     panel.controls.addCommand(settings_cmd)
     panel.controls.addCommand(export_cmd)
