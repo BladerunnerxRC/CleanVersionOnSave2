@@ -6,5 +6,5 @@
   "description": "Auto-renames Fusion documents, logs history, and validates names",
   "version": "1.0.0",
   "runOnStartup": true,
-  "main": "clean_version"
+  "main": "src/clean_version"
 }
