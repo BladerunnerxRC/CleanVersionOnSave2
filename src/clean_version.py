@@ -11,8 +11,8 @@ class DocumentSavingHandler(adsk.core.DocumentEventHandler):
             if not settings.featureEnabled:
                 return
 
-            app = adsk.core.Application.get()
-            doc = app.activeDocument
+            app      = adsk.core.Application.get()
+            doc      = app.activeDocument
             original = doc.name
 
             baseName = re.sub(r'\s*v\d+$', '', original)
@@ -31,37 +31,37 @@ class DocumentSavingHandler(adsk.core.DocumentEventHandler):
             logger.log_error(traceback.format_exc())
 
 def run(context):
-                                                                                                                                                                                                                                                            try:
-                                                                                                                                                                                                                                                                app = adsk.core.Application.get()
-                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                # Hook the save event
-                                                                                                                                                                                                                                                                saveHandler = DocumentSavingHandler()
-                                                                                                                                                                                                                                                                app.documentSaving.add(saveHandler)
-                                                                                                                                                                                                                                                                handlers.append(saveHandler)
-                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                # Register only your two UI commands
-                                                                                                                                                                                                                                                                commands.register_commands()
-                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                # Start any sync timer you have
-                                                                                                                                                                                                                                                                sync_timer.start()
-                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                            except:
-                                                                                                                                                                                                                                                                logger.log_error(traceback.format_exc())
-                                                                                                                                                                                                                                                        
+    try:
+        app = adsk.core.Application.get()
+
+        # Hook the save event
+        saveHandler = DocumentSavingHandler()
+        app.documentSaving.add(saveHandler)
+        handlers.append(saveHandler)
+
+        # Register only your two UI commands
+        commands.register_commands()
+
+        # Start any sync timer you have
+        sync_timer.start()
+
+    except:
+        logger.log_error(traceback.format_exc())
+
 def stop(context):
-                                                                                                                                                                                                                                                            try:
-                                                                                                                                                                                                                                                                app = adsk.core.Application.get()
-                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                # Remove save handler
-                                                                                                                                                                                                                                                                for h in handlers:
-                                                                                                                                                                                                                                                                    app.documentSaving.remove(h)
-                                                                                                                                                                                                                                                                handlers.clear()
-                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                # Stop sync
-                                                                                                                                                                                                                                                                sync_timer.stop()
-                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                                # Tear down only your commands
-                                                                                                                                                                                                                                                                commands.cleanup_commands()
-                                                                                                                                                                                                                                                        
-                                                                                                                                                                                                                                                            except:
-                                                                                                                                                                                                                                                                logger.log_error(traceback.format_exc())
+    try:
+        app = adsk.core.Application.get()
+
+        # Remove save handler
+        for h in handlers:
+            app.documentSaving.remove(h)
+        handlers.clear()
+
+        # Stop sync
+        sync_timer.stop()
+
+        # Tear down only your commands
+        commands.cleanup_commands()
+
+    except:
+        logger.log_error(traceback.format_exc())
