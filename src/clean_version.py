@@ -1,5 +1,5 @@
 import adsk.core, adsk.fusion, traceback
-import re, logger, validator, settings, timer
+import re, logger, validator, settings, timer, commands
 
 sync_timer = timer.SyncTimer()
 handlers    = []
@@ -7,7 +7,7 @@ handlers    = []
 class DocumentSavingHandler(adsk.core.DocumentEventHandler):
     def notify(self, args):
         try:
-            # Only rename if feature is turned on
+            settings.load()  # pick up any external changes
             if not settings.featureEnabled:
                 return
 
@@ -15,15 +15,11 @@ class DocumentSavingHandler(adsk.core.DocumentEventHandler):
             doc      = app.activeDocument
             original = doc.name
 
-            # Strip trailing ' v<digits>' tag
             baseName = re.sub(r'\s*v\d+$', '', original)
-
-            # Append custom text (if set), else leave baseName
-            newName = (
-                f"{baseName}{settings.customVersionText}"
-                if settings.customVersionText
-                else baseName
-            )
+            if settings.customVersionText:
+                newName = f"{baseName}{settings.customVersionText}"
+            else:
+                newName = baseName
 
             if validator.is_valid(newName):
                 doc.name = newName
@@ -43,11 +39,10 @@ def run(context):
         app.documentSaving.add(saveHandler)
         handlers.append(saveHandler)
 
-        # Register UI buttons
-        import commands
+        # Register only your two UI commands
         commands.register_commands()
 
-        # Start any external sync you have
+        # Start any sync timer you have
         sync_timer.start()
 
     except:
@@ -62,11 +57,10 @@ def stop(context):
             app.documentSaving.remove(h)
         handlers.clear()
 
-        # Stop sync timer
+        # Stop sync
         sync_timer.stop()
 
-        # Tear down commands (delete definitions & controls)
-        import commands
+        # Tear down only your commands
         commands.cleanup_commands()
 
     except:
