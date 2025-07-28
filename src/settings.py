@@ -1,83 +1,124 @@
 import adsk.core, adsk.fusion, json, os, traceback
 
-# Keep references so Fusion doesn’t GC them
-handlers = []
-palette = None
-htmlLoadedHandler = None
-htmlEventHandler = None
-idleHandler = None
+# Paths
+_addinFolder = os.path.dirname(__file__)
+_cfgPath     = os.path.join(_addinFolder, 'data', 'config.json')
+_htmlPath    = os.path.join(_addinFolder, 'resources', 'settings.html')
+
+# Default values
+featureEnabled     = False
+customVersionText  = ''
+
+def load():
+    """Read config.json into module globals, creating it if missing."""
+    global featureEnabled, customVersionText
+
+    if not os.path.exists(_cfgPath):
+        os.makedirs(os.path.dirname(_cfgPath), exist_ok=True)
+        with open(_cfgPath, 'w') as f:
+            json.dump({
+                "featureEnabled": False,
+                "customVersionText": ""
+            }, f, indent=2)
+
+    with open(_cfgPath, 'r') as f:
+        cfg = json.load(f)
+
+    featureEnabled    = bool(cfg.get('featureEnabled', False))
+    customVersionText = str(cfg.get('customVersionText', ''))
+
+    return cfg
+
+def save():
+    """Persist current globals to config.json."""
+    try:
+        cfg = {
+            "featureEnabled": featureEnabled,
+            "customVersionText": customVersionText
+        }
+        with open(_cfgPath, 'w') as f:
+            json.dump(cfg, f, indent=2)
+    except Exception:
+        adsk.core.Application.get().userInterface.messageBox(
+            f"Failed to write settings:\n{traceback.format_exc()}"
+        )
+
+# Load on import
+load()
+
+# HTML palette and handlers
+handlers           = []
+palette            = None
+htmlLoadedHandler  = None
+htmlEventHandler   = None
+idleHandler        = None
 
 def run(context):
     try:
         app = adsk.core.Application.get()
         ui  = app.userInterface
 
-        # Paths
-        addinFolder = os.path.dirname(__file__)
-        cfgPath     = os.path.join(addinFolder, 'data', 'config.json')
-        htmlPath    = os.path.join(addinFolder, 'resources', 'settings.html')
-
-        # Create the HTML palette
         global palette
         palette = ui.palettes.add(
             'MyAddinSettings', 'Settings',
-            htmlPath,
-            True,  # isVisible
-            True,  # showInPaletteList
-            True,  # initialStateDockable
-            600,   # width
-            400    # height
+            _htmlPath,
+            True, True, True,
+            600, 400
         )
 
         # 1) Push initial config.json on HTML load
         class OnHtmlLoaded(adsk.core.HTMLEventHandler):
             def notify(self, args):
                 try:
-                    with open(cfgPath, 'r') as f:
-                        cfg = json.load(f)
-                    # call JS loadSettings(cfg)
-                    palette.evaluateJavascript(f'loadSettings({json.dumps(cfg)});')
+                    cfg = load()
+                    palette.evaluateJavascript(
+                        f"loadSettings({json.dumps(cfg)});"
+                    )
                 except:
-                    ui.messageBox('Failed to load settings from disk.')
+                    ui.messageBox('Failed to load settings into HTML.')
 
         global htmlLoadedHandler
         htmlLoadedHandler = OnHtmlLoaded()
         palette.htmlLoaded.add(htmlLoadedHandler)
         handlers.append(htmlLoadedHandler)
 
-        # 2) Listen for Save clicks from JS, write back to disk
+        # 2) Save clicks from JS → update globals & disk
         class OnHtmlEvent(adsk.core.HTMLEventHandler):
             def notify(self, args):
                 try:
                     msg = json.loads(args.data)
                     if msg.get('action') == 'save':
-                        with open(cfgPath, 'w') as f:
-                            json.dump(msg['payload'], f, indent=2)
+                        data = msg['payload']
+                        # update module globals
+                        globals()['featureEnabled']    = bool(data.get('featureEnabled'))
+                        globals()['customVersionText'] = str(data.get('customVersionText'))
+                        save()
                         palette.evaluateJavascript("alert('Settings saved!');")
+                    # you can handle other actions here
                 except:
-                    ui.messageBox('Failed to save settings.')
+                    ui.messageBox('Failed to save settings from HTML.')
 
         global htmlEventHandler
         htmlEventHandler = OnHtmlEvent()
         palette.htmlEventReceived.add(htmlEventHandler)
         handlers.append(htmlEventHandler)
 
-        # 3) Idle handler: watch config.json for external edits
+        # 3) Idle: watch for external edits
         class IdleHandler(adsk.core.IdleEventHandler):
             def __init__(self):
                 super().__init__()
-                self.configPath = cfgPath
-                self.lastMTime  = os.path.getmtime(self.configPath)
+                self.lastMTime = os.path.getmtime(_cfgPath)
+
             def notify(self, args):
                 try:
-                    current = os.path.getmtime(self.configPath)
+                    current = os.path.getmtime(_cfgPath)
                     if current != self.lastMTime:
                         self.lastMTime = current
-                        with open(self.configPath, 'r') as f:
-                            cfg = json.load(f)
-                        # call JS updateSettings(cfg)
-                        if palette is not None:
-                            palette.evaluateJavascript(f'updateSettings({json.dumps(cfg)});')
+                        cfg = load()
+                        if palette:
+                            palette.evaluateJavascript(
+                                f"updateSettings({json.dumps(cfg)});"
+                            )
                 except:
                     pass
 
@@ -87,14 +128,13 @@ def run(context):
         handlers.append(idleHandler)
 
     except:
-        ui.messageBox('Add-in Start Failed:\n{}'.format(traceback.format_exc()))
+        ui.messageBox(f"Add-in Start Failed:\n{traceback.format_exc()}")
 
 def stop(context):
     try:
         app = adsk.core.Application.get()
         ui  = app.userInterface
 
-        # Remove handlers
         if idleHandler:
             app.idle.remove(idleHandler)
         if palette and htmlLoadedHandler:
@@ -102,11 +142,10 @@ def stop(context):
         if palette and htmlEventHandler:
             palette.htmlEventReceived.remove(htmlEventHandler)
 
-        # Delete the palette
         if palette:
             palette.deleteMe()
 
         handlers.clear()
 
     except:
-        ui.messageBox('Add-in Stop Failed:\n{}'.format(traceback.format_exc()))
+        ui.messageBox(f"Add-in Stop Failed:\n{traceback.format_exc()}")
