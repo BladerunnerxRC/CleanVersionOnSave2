@@ -30,7 +30,7 @@ class DocumentSavingHandler(adsk.core.DocumentEventHandler):
         except:
             logger.log_error(traceback.format_exc())
 
-                                                                                                                                                                                                                                                        def run(context):
+def run(context):
                                                                                                                                                                                                                                                             try:
                                                                                                                                                                                                                                                                 app = adsk.core.Application.get()
                                                                                                                                                                                                                                                         
@@ -48,7 +48,7 @@ class DocumentSavingHandler(adsk.core.DocumentEventHandler):
                                                                                                                                                                                                                                                             except:
                                                                                                                                                                                                                                                                 logger.log_error(traceback.format_exc())
                                                                                                                                                                                                                                                         
-                                                                                                                                                                                                                                                        def stop(context):
+def stop(context):
                                                                                                                                                                                                                                                             try:
                                                                                                                                                                                                                                                                 app = adsk.core.Application.get()
                                                                                                                                                                                                                                                         
