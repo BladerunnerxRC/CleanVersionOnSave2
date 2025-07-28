@@ -1,16 +1,48 @@
-import requests, json, os
-from settings import load_settings
+import adsk.core, adsk.fusion, traceback
+import commands, settings, timer
 
-def sync_latest_rename():
-    cfg = load_settings()
-    api_key = cfg.get('apiKey')        # store API key in config.json
-    endpoint = cfg.get('apiEndpoint')
-    history = os.path.join(os.path.dirname(__file__), '..', 'data', 'rename_history.json')
+handlers     = []
+sync_timer   = timer.SyncTimer()
 
+def run(context):
+    ui = None
     try:
-        with open(history) as f:
-            last = json.loads(f.readlines()[-1])
-        headers = {'Authorization': f'Bearer {api_key}'}
-        requests.post(endpoint, json=last, headers=headers, timeout=10)
-    except Exception as e:
-        print(f"[Integration Error] {e}")
+        app = adsk.core.Application.get()
+        ui  = app.userInterface
+
+        # 1) Register ONLY your Settings & Export buttons
+        commands.register_commands()
+
+        # 2) Hook the auto-rename on save
+        from clean_version import DocumentSavingHandler
+        saveHandler = DocumentSavingHandler()
+        app.documentSaving.add(saveHandler)
+        handlers.append(saveHandler)
+
+        # 3) Start any background timer you have
+        sync_timer.start()
+
+    except Exception:
+        if ui:
+            ui.messageBox(f'Add-In start failed:\n{traceback.format_exc()}')
+
+def stop(context):
+    ui = None
+    try:
+        app = adsk.core.Application.get()
+        ui  = app.userInterface
+
+        # 1) Remove save handlers
+        for h in handlers:
+            app.documentSaving.remove(h)
+        handlers.clear()
+
+        # 2) Stop background timer
+        sync_timer.stop()
+
+        # 3) Tear down your two buttons
+        commands.cleanup_commands()
+
+    except Exception:
+        if ui:
+            ui.messageBox(f'Add-In stop failed:\n{traceback.format_exc()}')
