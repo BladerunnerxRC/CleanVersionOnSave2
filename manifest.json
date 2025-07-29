@@ -1,10 +1,13 @@
 {
-  "autodeskProduct": "fusion360",
-  "type": "addin",
+  "autodeskProduct": "Fusion",
   "id": "com.thomas.cleanversiononsave2",
-  "author": "ThomasnnerxRC",
-  "description": "Auto-renames Fusion documents, logs history, and validates names",
+  "name": "CleanVersionOnSave2",
   "version": "1.0.0",
+  "author": "BladerunnerxRC",
+  "description": "Auto-renames Fusion documents, logs history, and validates names",
+  "type": "addin",
   "runOnStartup": true,
-  "main": "src/clean_version"
+  "supportedOS": ["windows"],
+  "main": "CleanVersionOnSave2.py",
+  "iconFilename": "AddInIcon.svg"
 }
