@@ -1,20 +1,31 @@
-import threading, integration
+# src/timer.py
+
+import threading
 
 class SyncTimer:
-    def __init__(self, interval_sec=300):
-        self.interval = interval_sec
-        self.running = False
-        self.thread = None
+    """
+    A reusable timer that calls the provided sync_func every interval_sec.
+    """
+
+    def __init__(self, sync_func, interval_sec=300):
+        self._sync       = sync_func
+        self._interval   = interval_sec
+        self._timer      = None
+
+    def _run(self):
+        try:
+            self._sync()
+        finally:
+            # re-schedule
+            self.start()
 
     def start(self):
-        self.running = True
-        self.thread = threading.Thread(target=self.loop)
-        self.thread.start()
-
-    def loop(self):
-        while self.running:
-            integration.sync_latest_rename()
-            threading.Event().wait(self.interval)
+        if self._timer is None:
+            self._timer = threading.Timer(self._interval, self._run)
+            self._timer.daemon = True
+            self._timer.start()
 
     def stop(self):
-        self.running = False
+        if self._timer:
+            self._timer.cancel()
+            self._timer = None
