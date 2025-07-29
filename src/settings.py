@@ -1,112 +1,89 @@
-import adsk.core, adsk.fusion, json, os, traceback
+import adsk.core, adsk.fusion, traceback, os
 
-# Keep references so Fusion doesn’t GC them
-handlers = []
-palette = None
-htmlLoadedHandler = None
-htmlEventHandler = None
-idleHandler = None
+_handlers = []
+_palette = None
 
-def run(context):
-    try:
-        app = adsk.core.Application.get()
-        ui  = app.userInterface
+def create_settings_command(ui):
+    cmdDefs = ui.commandDefinitions
+    cmdId = 'CleanVersionSettings'
+    cmdName = 'CleanVersion Settings'
+    cmdTooltip = 'Configure CleanVersion options'
 
-        # Paths
-        addinFolder = os.path.dirname(__file__)
-        cfgPath     = os.path.join(addinFolder, 'data', 'config.json')
-        htmlPath    = os.path.join(addinFolder, 'resources', 'settings.html')
+    # Create the command definition if it doesn't exist
+    cmdDef = cmdDefs.itemById(cmdId)
+    if not cmdDef:
+        icons_folder = os.path.join(os.path.dirname(__file__), 'resources', 'icons')
+        cmdDef = cmdDefs.addButtonDefinition(cmdId, cmdName, cmdTooltip, icons_folder)
+        # Assign toolbar icons
+        cmdDef.resourceFolder      = icons_folder
+        cmdDef.smallIconFilename   = os.path.join(icons_folder, 'icon16.png')
+        cmdDef.largeIconFilename   = os.path.join(icons_folder, 'icon32.png')
 
-        # Create the HTML palette
-        global palette
-        palette = ui.palettes.add(
-            'MyAddinSettings', 'Settings',
-            htmlPath,
-            True,  # isVisible
-            True,  # showInPaletteList
-            True,  # initialStateDockable
-            600,   # width
-            400    # height
-        )
+        # Handle command creation
+        onCreated = SettingsCreatedHandler()
+        cmdDef.commandCreated.add(onCreated)
+        _handlers.append(onCreated)
 
-        # 1) Push initial config.json on HTML load
-        class OnHtmlLoaded(adsk.core.HTMLEventHandler):
-            def notify(self, args):
-                try:
-                    with open(cfgPath, 'r') as f:
-                        cfg = json.load(f)
-                    # call JS loadSettings(cfg)
-                    palette.evaluateJavascript(f'loadSettings({json.dumps(cfg)});')
-                except:
-                    ui.messageBox('Failed to load settings from disk.')
+    # Add the button to the Scripts & Add-ins panel
+    panel = ui.allToolbarPanels.itemById('SolidScriptsAddinsPanel')
+    panel.controls.addCommand(cmdDef)
 
-        global htmlLoadedHandler
-        htmlLoadedHandler = OnHtmlLoaded()
-        palette.htmlLoaded.add(htmlLoadedHandler)
-        handlers.append(htmlLoadedHandler)
 
-        # 2) Listen for Save clicks from JS, write back to disk
-        class OnHtmlEvent(adsk.core.HTMLEventHandler):
-            def notify(self, args):
-                try:
-                    msg = json.loads(args.data)
-                    if msg.get('action') == 'save':
-                        with open(cfgPath, 'w') as f:
-                            json.dump(msg['payload'], f, indent=2)
-                        palette.evaluateJavascript("alert('Settings saved!');")
-                except:
-                    ui.messageBox('Failed to save settings.')
+class SettingsCreatedHandler(adsk.core.CommandCreatedEventHandler):
+    def notify(self, args):
+        try:
+            cmd = args.command
+            onExecute = SettingsExecuteHandler()
+            cmd.execute.add(onExecute)
+            _handlers.append(onExecute)
+        except:
+            ui = adsk.core.Application.get().userInterface
+            ui.messageBox(f'Settings command creation failed:\n{traceback.format_exc()}')
 
-        global htmlEventHandler
-        htmlEventHandler = OnHtmlEvent()
-        palette.htmlEventReceived.add(htmlEventHandler)
-        handlers.append(htmlEventHandler)
 
-        # 3) Idle handler: watch config.json for external edits
-        class IdleHandler(adsk.core.IdleEventHandler):
-            def __init__(self):
-                super().__init__()
-                self.configPath = cfgPath
-                self.lastMTime  = os.path.getmtime(self.configPath)
-            def notify(self, args):
-                try:
-                    current = os.path.getmtime(self.configPath)
-                    if current != self.lastMTime:
-                        self.lastMTime = current
-                        with open(self.configPath, 'r') as f:
-                            cfg = json.load(f)
-                        # call JS updateSettings(cfg)
-                        if palette is not None:
-                            palette.evaluateJavascript(f'updateSettings({json.dumps(cfg)});')
-                except:
-                    pass
+class SettingsExecuteHandler(adsk.core.CommandEventHandler):
+    def notify(self, args):
+        global _palette
+        ui = adsk.core.Application.get().userInterface
+        try:
+            # If palette exists, just show it
+            if _palette:
+                _palette.isVisible = True
+                return
 
-        global idleHandler
-        idleHandler = IdleHandler()
-        app.idle.add(idleHandler)
-        handlers.append(idleHandler)
+            # Create and display the HTML palette
+            html_path = os.path.join(os.path.dirname(__file__), 'resources', 'settings.html')
+            _palette = ui.palettes.add(
+                'CleanVersionSettingsPanel',  # unique ID
+                'Settings',                   # display name
+                html_path, True, True, True, 600, 400
+            )
 
-    except:
-        ui.messageBox('Add-in Start Failed:\n{}'.format(traceback.format_exc()))
+            # Assign your custom icons
+            icons_folder = os.path.join(os.path.dirname(__file__), 'resources', 'icons')
+            _palette.smallIconFilename = os.path.join(icons_folder, 'icon16.png')
+            _palette.largeIconFilename = os.path.join(icons_folder, 'icon32.png')
 
-def stop(context):
-    try:
-        app = adsk.core.Application.get()
-        ui  = app.userInterface
+            # Dock it on the right and show
+            _palette.dockingState = adsk.core.PaletteDockingStates.PaletteDockStateRight
+            _palette.isVisible = True
 
-        # Remove handlers
-        if idleHandler:
-            app.idle.remove(idleHandler)
-        if palette and htmlLoadedHandler:
-            palette.htmlLoaded.remove(htmlLoadedHandler)
-        if palette and htmlEventHandler:
-            palette.htmlEventReceived.remove(htmlEventHandler)
+        except:
+            ui.messageBox(f'Failed to show settings palette:\n{traceback.format_exc()}')
 
-        # Delete the palette
-        if palette:
-            palette.deleteMe()
 
-        handlers.clear()
+def cleanup_settings(ui):
+    global _palette
 
-    except:
-        ui.messageBox('Add-in Stop Failed:\n{}'.format(traceback.format_exc()))
+    # Remove the palette
+    if _palette:
+        _palette.deleteMe()
+        _palette = None
+
+    # Remove the command definition
+    cmdDef = ui.commandDefinitions.itemById('CleanVersionSettings')
+    if cmdDef:
+        cmdDef.deleteMe()
+
+    # Clear all event handlers
+    _handlers.clear()

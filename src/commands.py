@@ -1,47 +1,94 @@
+# src/commands.py
+
 import os
-import adsk.core, adsk.fusion
-import settings, export_hook
+import adsk.core, adsk.fusion, traceback
 
-handlers = []
+# Module‐level lists to track everything so we can clean up
+_command_defs     = []
+_command_handlers = []
+_command_controls = []
 
-class SettingsCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
-    def notify(self, args):
-        settings.show_settings()
-
-class ExportCommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
-    def notify(self, args):
-        export_hook.on_export(None)
+# The two commands we want in the SOLID → Scripts & Add-Ins panel
+_COMMANDS = [
+    dict(
+        id='CV_SettingsCmd',
+        name='CV Settings',
+        tooltip='Configure CleanVersion settings',
+        handlerClassName='SettingsCommandCreatedHandler'
+    ),
+    dict(
+        id='CV_ExportCmd',
+        name='Export History',
+        tooltip='Export CleanVersion history log',
+        handlerClassName='ExportCommandCreatedHandler'
+    ),
+]
 
 def register_commands():
+    """
+    Create command definitions, add them to the Fusion UI panel, and
+    hook their CommandCreated events.
+    """
     app = adsk.core.Application.get()
-    ui = app.userInterface
+    ui  = app.userInterface
 
-    # Absolute path to your icons folder
-    ICON_FOLDER = os.path.join(os.path.dirname(__file__), 'resources', 'icons')
+    # Locate the SOLID → Scripts & Add-Ins panel
+    ws    = ui.workspaces.itemById('FusionSolidEnvironment')
+    panel = ws.toolbarPanels.itemById('SolidScriptsAddinsPanel')
 
-    # Settings button
-    settings_cmd = ui.commandDefinitions.addButtonDefinition(
-        'cmdSettings',                   # internal ID
-        'CleanVersion Settings',         # displayed name
-        'Configure renaming behavior',   # tooltip description
-        ICON_FOLDER                      # path to your icons
+    # Where to find 16×16 and 32×32 icons
+    resource_folder = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), '..', 'resources', 'icons')
     )
-    settings_handler = SettingsCommandCreatedEventHandler()
-    settings_cmd.commandCreated.add(settings_handler)
-    handlers.append(settings_handler)
 
-    # Manual export button
-    export_cmd = ui.commandDefinitions.addButtonDefinition(
-        'cmdExport',                       # internal ID
-        'Export Clean Version',            # displayed name
-        'Export STEP with cleaned name',   # tooltip description
-        ICON_FOLDER                        # path to your icons
-    )
-    export_handler = ExportCommandCreatedEventHandler()
-    export_cmd.commandCreated.add(export_handler)
-    handlers.append(export_handler)
+    for cmd in _COMMANDS:
+        # 1) Command Definition
+        cmd_def = ui.commandDefinitions.itemById(cmd['id'])
+        if not cmd_def:
+            cmd_def = ui.commandDefinitions.addButtonDefinition(
+                cmd['id'],
+                cmd['name'],
+                cmd['tooltip'],
+                resource_folder
+            )
+        _command_defs.append(cmd_def)
 
-    # Add commands to the Solid Create panel
-    panel = ui.allToolbarPanels.itemById('SolidCreatePanel')
-    panel.controls.addCommand(settings_cmd)
-    panel.controls.addCommand(export_cmd)
+        # 2) Add to panel
+        control = panel.controls.addCommand(cmd_def)
+        _command_controls.append(control)
+
+        # 3) Hook the creation event
+        module_name = f"src.command_handlers.{cmd['handlerClassName']}"
+        handler_module = __import__(module_name, fromlist=[cmd['handlerClassName']])
+        handler_cls    = getattr(handler_module, cmd['handlerClassName'])
+        handler        = handler_cls()
+        cmd_def.commandCreated.add(handler)
+        _command_handlers.append(handler)
+
+def cleanup_commands():
+    """
+    Remove the UI controls and command definitions we added.
+    """
+    # 1) Remove controls
+    for ctrl in _command_controls:
+        try:
+            ctrl.deleteMe()
+        except:
+            pass
+    _command_controls.clear()
+
+    # 2) Remove command event handlers
+    for handler in _command_handlers:
+        try:
+            handler.deleteMe()
+        except:
+            pass
+    _command_handlers.clear()
+
+    # 3) Remove definitions
+    for cmd_def in _command_defs:
+        try:
+            cmd_def.deleteMe()
+        except:
+            pass
+    _command_defs.clear()
